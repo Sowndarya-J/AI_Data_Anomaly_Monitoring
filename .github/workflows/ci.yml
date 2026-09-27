@@ -15,6 +15,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: testpassword
+          MARIADB_DATABASE: ecommerce_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -u root -ptestpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
 
       - name: Checkout repository
@@ -25,28 +39,17 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install MySQL Server
+      - name: Wait for MySQL
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-server mysql-client
-
-      - name: Start MySQL
-        run: |
-          sudo systemctl start mysql
-          sudo systemctl status mysql --no-pager
-
-      - name: Configure MySQL
-        run: |
-          sudo mysql --protocol=socket -e "CREATE DATABASE IF NOT EXISTS ecommerce_db;"
-          sudo mysql --protocol=socket -e "CREATE USER IF NOT EXISTS 'testuser'@'localhost' IDENTIFIED BY 'testpassword';"
-          sudo mysql --protocol=socket -e "ALTER USER 'testuser'@'localhost' IDENTIFIED BY 'testpassword';"
-          sudo mysql --protocol=socket -e "GRANT ALL PRIVILEGES ON ecommerce_db.* TO 'testuser'@'localhost';"
-          sudo mysql --protocol=socket -e "FLUSH PRIVILEGES;"
+          for i in {1..30}; do
+            mysqladmin ping -h 127.0.0.1 -u root -ptestpassword && break
+            sleep 2
+          done
 
       - name: Verify MySQL
         run: |
-          mysql -h 127.0.0.1 -u testuser -ptestpassword -e "SELECT VERSION();"
-          mysql -h 127.0.0.1 -u testuser -ptestpassword -e "SHOW DATABASES;"
+          mysql -h 127.0.0.1 -u root -ptestpassword -e "SELECT VERSION();"
+          mysql -h 127.0.0.1 -u root -ptestpassword -e "SHOW DATABASES;"
 
       - name: Install Python dependencies
         run: |
@@ -58,7 +61,7 @@ jobs:
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_USER: testuser
+          DB_USER: root
           DB_PASSWORD: testpassword
           DB_NAME: ecommerce_db
         run: |
@@ -68,7 +71,7 @@ jobs:
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_USER: testuser
+          DB_USER: root
           DB_PASSWORD: testpassword
           DB_NAME: ecommerce_db
         run: |
