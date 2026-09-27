@@ -4,12 +4,9 @@ on:
   push:
     branches:
       - main
-      - master
-
   pull_request:
     branches:
       - main
-      - master
 
 jobs:
   test:
@@ -19,24 +16,21 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: #Sownd@1710#
           MYSQL_DATABASE: ecommerce_db
-          MYSQL_USER: testuser
-          MYSQL_PASSWORD: testpassword
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -44,38 +38,31 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy scikit-learn
-          pip install mysql-connector-python
-          pip install pytest fastapi uvicorn streamlit requests
-          pip install httpx2
+          pip install -r requirements.txt
 
       - name: Wait for MySQL
         run: |
           for i in {1..30}; do
-            if mysqladmin ping -h 127.0.0.1 -P 3306 -u root -proot --silent; then
-              echo "MySQL is ready"
-              break
-            fi
-            echo "Waiting for MySQL..."
+            mysqladmin ping -h 127.0.0.1 -uroot -proot && break
             sleep 2
           done
 
-      - name: Create database table
+      - name: Load data into MySQL
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_USER: testuser
-          DB_PASSWORD: testpassword
+          DB_USER: root
+          DB_PASSWORD: root
           DB_NAME: ecommerce_db
         run: |
           python src/load_to_mysql.py
 
-      - name: Run Pytest
+      - name: Run tests
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_USER: testuser
-          DB_PASSWORD: testpassword
+          DB_USER: root
+          DB_PASSWORD: root
           DB_NAME: ecommerce_db
         run: |
           pytest -v
