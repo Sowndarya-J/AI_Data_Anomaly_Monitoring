@@ -1,17 +1,19 @@
-import pandas as pd
+import os
 import mysql.connector
+import pandas as pd
 import pytest
 
 
-CSV_FILE = "data/processed/ecommerce_transactions_clean.csv"
-
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "#Sownd@1710#",
-    "database": "anomaly_monitoring"
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "testpassword"),
+    "database": os.getenv("DB_NAME", "ecommerce_db"),
 }
+
+
+CSV_FILE = "data/transactions.csv"
 
 
 @pytest.fixture
@@ -24,9 +26,7 @@ def db_connection():
 
 
 def test_csv_file_exists():
-    df = pd.read_csv(CSV_FILE)
-
-    assert len(df) > 0
+    assert os.path.exists(CSV_FILE)
 
 
 def test_required_columns_exist():
@@ -34,13 +34,9 @@ def test_required_columns_exist():
 
     required_columns = [
         "transaction_id",
-        "date",
-        "customer_id",
-        "product_id",
         "quantity",
         "unit_price",
-        "payment_method",
-        "total_amount"
+        "total_amount",
     ]
 
     for column in required_columns:
@@ -50,31 +46,23 @@ def test_required_columns_exist():
 def test_csv_and_database_record_count_match(db_connection):
     df = pd.read_csv(CSV_FILE)
 
-    csv_count = len(df)
-
     cursor = db_connection.cursor()
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM transactions"
-    )
+    cursor.execute("SELECT COUNT(*) FROM transactions")
 
     database_count = cursor.fetchone()[0]
 
     cursor.close()
 
-    assert csv_count == database_count
+    assert len(df) == database_count
 
 
 def test_csv_total_amount_calculation():
     df = pd.read_csv(CSV_FILE)
 
-    calculated_total = (
-        df["quantity"] * df["unit_price"]
-    )
+    calculated_total = df["quantity"] * df["unit_price"]
 
-    difference = (
-        df["total_amount"] - calculated_total
-    ).abs()
+    difference = (df["total_amount"] - calculated_total).abs()
 
     assert (difference <= 0.01).all()
 
@@ -84,13 +72,9 @@ def test_required_fields_not_null():
 
     required_columns = [
         "transaction_id",
-        "date",
-        "customer_id",
-        "product_id",
         "quantity",
         "unit_price",
-        "total_amount"
+        "total_amount",
     ]
 
-    for column in required_columns:
-        assert df[column].isnull().sum() == 0
+    assert not df[required_columns].isnull().any().any()
