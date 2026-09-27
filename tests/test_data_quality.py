@@ -1,13 +1,14 @@
+import os
 import mysql.connector
 import pytest
 
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "#Sownd@1710#",
-    "database": "anomaly_monitoring"
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "database": os.getenv("DB_NAME", "ecommerce_db")
 }
 
 
