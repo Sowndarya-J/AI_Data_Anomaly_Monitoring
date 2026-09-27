@@ -1,0 +1,44 @@
+name: AI Data Anomaly Monitoring CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Download repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn
+          pip install mysql-connector-python
+          pip install pytest fastapi uvicorn streamlit requests
+          pip install httpx2
+
+      # 4. Run automated tests
+      - name: Run Pytest
+        run: |
+          pytest -v
