@@ -4,65 +4,74 @@ on:
   push:
     branches:
       - main
+      - master
+
   pull_request:
     branches:
       - main
+      - master
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: #Sownd@1710#
-          MYSQL_DATABASE: ecommerce_db
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Install MySQL Server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-server mysql-client
+
+      - name: Start MySQL
+        run: |
+          sudo systemctl start mysql
+          sudo systemctl status mysql --no-pager
+
+      - name: Configure MySQL
+        env:
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        run: |
+          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_PASSWORD}';"
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS ecommerce_db;"
+          sudo mysql -e "FLUSH PRIVILEGES;"
+
+      - name: Verify MySQL
+        env:
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        run: |
+          mysql -h 127.0.0.1 -u root -p"${MYSQL_PASSWORD}" -e "SELECT VERSION();"
+          mysql -h 127.0.0.1 -u root -p"${MYSQL_PASSWORD}" -e "SHOW DATABASES;"
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install httpx2
 
-      - name: Wait for MySQL
-        run: |
-          for i in {1..30}; do
-            mysqladmin ping -h 127.0.0.1 -uroot -proot && break
-            sleep 2
-          done
-
-      - name: Load data into MySQL
+      - name: Load transaction data
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_USER: root
-          DB_PASSWORD: root
+          DB_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           DB_NAME: ecommerce_db
         run: |
           python src/load_to_mysql.py
 
-      - name: Run tests
+      - name: Run Pytest
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_USER: root
-          DB_PASSWORD: root
+          DB_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           DB_NAME: ecommerce_db
         run: |
           pytest -v
