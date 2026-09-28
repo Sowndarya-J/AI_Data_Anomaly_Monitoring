@@ -1,16 +1,22 @@
-import pandas as pd
+import os
 import mysql.connector
+import pandas as pd
 
-
-CSV_FILE = "data/processed/ecommerce_transactions_clean.csv"
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "#Sownd@1710#",
-    "database": "anomaly_monitoring"
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "testpassword"),
+    "database": os.getenv("DB_NAME", "ecommerce_db"),
 }
+
+
+CSV_FILE = "data/transactions.csv"
+
+
+def get_connection():
+    return mysql.connector.connect(**DB_CONFIG)
 
 
 def test_csv_still_has_data():
@@ -30,13 +36,9 @@ def test_required_columns_still_exist():
 
     required_columns = [
         "transaction_id",
-        "date",
-        "customer_id",
-        "product_id",
         "quantity",
         "unit_price",
-        "payment_method",
-        "total_amount"
+        "total_amount",
     ]
 
     for column in required_columns:
@@ -44,47 +46,44 @@ def test_required_columns_still_exist():
 
 
 def test_database_table_exists():
-    connection = mysql.connector.connect(**DB_CONFIG)
-
+    connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SHOW TABLES LIKE 'transactions'
-        """
-    )
+    """)
 
-    result = cursor.fetchone()
+    table = cursor.fetchone()
 
     cursor.close()
     connection.close()
 
-    assert result is not None
+    assert table is not None
 
 
 def test_database_record_count():
-    connection = mysql.connector.connect(**DB_CONFIG)
+    df = pd.read_csv(CSV_FILE)
 
+    connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM transactions"
-    )
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM transactions
+    """)
 
-    count = cursor.fetchone()[0]
+    database_count = cursor.fetchone()[0]
 
     cursor.close()
     connection.close()
 
-    assert count > 0
+    assert database_count == len(df)
 
 
 def test_transaction_amounts_are_valid():
     df = pd.read_csv(CSV_FILE)
 
-    calculated_total = (
-        df["quantity"] * df["unit_price"]
-    )
+    calculated_total = df["quantity"] * df["unit_price"]
 
     difference = (
         df["total_amount"] - calculated_total

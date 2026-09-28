@@ -67,6 +67,22 @@ jobs:
         run: |
           python src/load_to_mysql.py
 
+      - name: Run anomaly detection
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: testpassword
+          DB_NAME: ecommerce_db
+        run: |
+          python src/anomaly_detection/anomaly_detector.py
+
+      - name: Verify anomaly results
+        run: |
+          test -f reports/anomaly_results.csv
+          echo "Anomaly results file created successfully"
+          wc -l reports/anomaly_results.csv
+
       - name: Run Pytest
         env:
           DB_HOST: 127.0.0.1
